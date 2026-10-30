@@ -42,7 +42,7 @@ def guardar_datos(datos):
 datos = cargar_datos()
 
 st.title("💰 Sistema de Gestión de Natillera 2027")
-st.caption("Inicio de vigencia: 15 de Enero de 2027 | Panel de Control y Administración.")
+st.caption("Inicio de vigencia: 15 de Enero de 2027 | Panel de Control y Sábana de Datos.")
 
 # Navegación
 opcion = st.sidebar.radio(
@@ -52,7 +52,7 @@ opcion = st.sidebar.radio(
         "💵 Ahorros y Multas", 
         "🎲 Rifa (Lotería)", 
         "🏦 Préstamos y Cartera", 
-        "📈 Reportes y Estado",
+        "📈 Sábana de Control (Reportes)",
         "🔐 Panel de Administración",
         "📊 Resumen y Liquidación"
     ]
@@ -120,11 +120,11 @@ if opcion == "👥 Socios":
         st.write("Aún no hay socios registrados.")
 
 # ----------------------------------------------------
-# 2. MÓDULO DE AHORROS Y MULTAS (CON TIPO DE PAGO)
+# 2. MÓDULO DE AHORROS Y MULTAS
 # ----------------------------------------------------
 elif opcion == "💵 Ahorros y Multas":
     st.header("💵 Control de Ahorros y Penalizaciones")
-    st.caption("Fechas límite: días 2 y 16. Multas por mora: $4.000 (quincenal) / $8.000 (mensual). Acumulables para el cierre de año.")
+    st.caption("Fechas límite: días 2 y 16. Multas por mora: $4.000 (quincenal) / $8.000 (mensual).")
     
     if not datos["socios"]:
         st.warning("⚠️ Primero debes registrar socios en el módulo de Socios.")
@@ -172,7 +172,7 @@ elif opcion == "💵 Ahorros y Multas":
                 guardar_datos(datos)
                 
                 if multa_aplicada > 0:
-                    st.warning("⚠️ Pago (" + tipo_pago + ") registrado fuera de fecha límite. Se acumula una multa para fin de año.")
+                    st.warning("⚠️ Pago (" + tipo_pago + ") registrado fuera de fecha. Multa acumulada de $" + f"{multa_aplicada:,.0f}")
                 else:
                     st.success("✅ Transacción en " + tipo_pago + " registrada con éxito.")
 
@@ -196,7 +196,7 @@ elif opcion == "🎲 Rifa (Lotería)":
             mes_sorteo = st.selectbox("Mes del Sorteo", ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"])
             fecha_sorteo = st.date_input("Fecha del Sorteo", value=FECHA_INICIO_NATILLERA)
         with col2:
-            numero_ganador = st.number_input("Número Ganador (2 últimos dígitos Lotería de Medellín)", min_value=0, max_value=99, step=1, format="%02d")
+            numero_ganador = st.number_input("Número Ganador (2 últimos dígitos)", min_value=0, max_value=99, step=1, format="%02d")
         
         btn_registrar_sorteo = st.form_submit_button("Registrar Ganador del Sorteo")
         
@@ -224,7 +224,7 @@ elif opcion == "🎲 Rifa (Lotería)":
                 st.balloons()
                 st.success("🎉 ¡Felicidades a " + nombre_ganador + "!")
             else:
-                st.info("El número no está asignado a ningún socio. El 100% pasa al fondo común.")
+                st.info("El número no está asignado. El 100% pasa al fondo común.")
 
     st.subheader("📋 Historial de Sorteos Registrados")
     if datos["rifas_sorteos"]:
@@ -324,41 +324,63 @@ elif opcion == "🏦 Préstamos y Cartera":
             st.dataframe(pd.DataFrame(datos["prestamos"]), use_container_width=True)
 
 # ----------------------------------------------------
-# 5. MÓDULO DE REPORTES Y ESTADO
+# 5. SÁBANA DE CONTROL (REPORTES DETALLADOS)
 # ----------------------------------------------------
-elif opcion == "📈 Reportes y Estado":
-    st.header("📈 Reportes y Estado Financiero General")
-    st.caption("Tablas de consulta general para la natillera.")
+elif opcion == "📈 Sábana de Control (Reportes)":
+    st.header("📈 Sábana de Control Detallada por Socio")
+    st.caption("Vista completa con el número de cuotas dadas, sumatorias de ahorro, rifas, multas y deudas de préstamos.")
 
     if not datos["socios"]:
         st.warning("⚠️ No hay socios registrados.")
     else:
-        reporte_list = []
+        sabana_list = []
         for s in datos["socios"]:
-            ahorro_s = sum([a.get("ahorro", 0) for a in datos["ahorros"] if a["socio_id"] == s["id"]])
-            rifa_s = sum([a.get("rifa", 0) for a in datos["ahorros"] if a["socio_id"] == s["id"]])
-            multas_s = sum([a.get("multa_pendiente", 0) for a in datos["ahorros"] if a["socio_id"] == s["id"]])
+            # Filtrar transacciones del socio
+            pagos_socio = [a for a in datos["ahorros"] if a["socio_id"] == s["id"]]
+            
+            # Cantidad de cuotas de ahorro registradas (cuántas veces ha pagado)
+            cantidad_cuotas = len(pagos_socio)
+            
+            # Sumatorias
+            total_ahorro_s = sum([a.get("ahorro", 0) for a in pagos_socio])
+            total_rifa_s = sum([a.get("rifa", 0) for a in pagos_socio])
+            total_multas_s = sum([a.get("multa_pendiente", 0) for a in pagos_socio])
+            
+            # Préstamos y deuda de capital
             prestamos_s = [p for p in datos["prestamos"] if p["socio_id"] == s["id"]]
             deuda_capital_s = sum([p.get("saldo_capital", 0) for p in prestamos_s])
             
-            reporte_list.append({
+            sabana_list.append({
                 "ID": s["id"],
-                "Nombre": s["nombre"],
+                "Socio": s["nombre"],
                 "N° Rifa": f"{s['numero_rifa']:02d}",
                 "Frecuencia": s["frecuencia"],
-                "Ahorro Acumulado": ahorro_s,
-                "Aporte Rifas": rifa_s,
-                "Multas Acumuladas": multas_s,
-                "Deuda Préstamos": deuda_capital_s
+                "Cant. Cuotas Dadas": cantidad_cuotas,
+                "Total Ahorrado ($)": total_ahorro_s,
+                "Aporte Rifas ($)": total_rifa_s,
+                "Multas Acumuladas ($)": total_multas_s,
+                "Deuda Préstamos ($)": deuda_capital_s
             })
             
-        df_reporte = pd.DataFrame(reporte_list)
-        st.dataframe(df_reporte.style.format({
-            "Ahorro Acumulado": "${:,.0f}",
-            "Aporte Rifas": "${:,.0f}",
-            "Multas Acumuladas": "${:,.0f}",
-            "Deuda Préstamos": "${:,.0f}"
+        df_sabana = pd.DataFrame(sabana_list)
+        
+        # Mostrar tabla interactiva con formato de moneda
+        st.dataframe(df_sabana.style.format({
+            "Total Ahorrado ($)": "${:,.0f}",
+            "Aporte Rifas ($)": "${:,.0f}",
+            "Multas Acumuladas ($)": "${:,.0f}",
+            "Deuda Préstamos ($)": "${:,.0f}"
         }), use_container_width=True)
+
+        # Botón de descarga en CSV (Sábana Completa)
+        st.divider()
+        csv_sabana = df_sabana.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Descargar Sábana Completa en CSV",
+            data=csv_sabana,
+            file_name="sabana_control_natillera_2027.csv",
+            mime="text/csv"
+        )
 
 # ----------------------------------------------------
 # 6. PANEL DE ADMINISTRACIÓN (EXCLUSIVO PARA TI)
@@ -390,7 +412,6 @@ elif opcion == "🔐 Panel de Administración":
     st.divider()
     st.subheader("📥 Exportar Datos")
     
-    # Botón de exportación CSV nativo de Pandas (sin requerir openpyxl)
     df_export = pd.DataFrame(datos["socios"])
     if not df_export.empty:
         csv_data = df_export.to_csv(index=False).encode('utf-8')
