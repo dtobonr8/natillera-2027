@@ -108,7 +108,6 @@ elif opcion == "💵 Ahorros y Multas":
     if not datos["socios"]:
         st.warning("⚠️ Primero debes registrar socios en el módulo de Socios.")
     else:
-        # Crear un diccionario para mostrar nombre y su frecuencia
         socios_opciones = {f"{s['id']} - {s['nombre']} ({s['frecuencia']})": s for s in datos["socios"]}
         
         with st.form("form_registrar_ahorro", clear_on_submit=True):
@@ -128,13 +127,10 @@ elif opcion == "💵 Ahorros y Multas":
                 dia = fecha_pago.day
                 multa_aplicada = 0
                 
-                # Validación de mora según los días 2 y 16
-                # Si es quincenal, se evalúa si se pasó del 2 o del 16
                 if socio_info["frecuencia"] == "Quincenal":
-                    # Determinamos si está en mora (ej: si pagó después del 2 o después del 16)
                     if (dia > 2 and dia < 16) or (dia > 16):
                         multa_aplicada = 4000
-                else:  # Mensual
+                else:
                     if dia > 2:
                         multa_aplicada = 8000
                 
@@ -157,7 +153,6 @@ elif opcion == "💵 Ahorros y Multas":
                 else:
                     st.success(f"✅ Transacción registrada con éxito para {socio_info['nombre']}.")
 
-        # Historial de Ahorros
         st.subheader("📊 Historial de Pagos y Ahorros Registrados")
         if datos["ahorros"]:
             df_ahorros = pd.DataFrame(datos["ahorros"])
@@ -188,15 +183,3 @@ elif opcion == "📊 Resumen y Liquidación":
     st.header("📊 Estado General y Cierre de Vigencia")
     st.caption("Fondo común total y cruce automático de deudas de fin de año.")
     st.write("Módulo en desarrollo...")
-```[cite: 1]
-
----
-
-### ¿Qué se agregó en esta versión?
-* 📝 **Selector de Socio:** Toma automáticamente la lista de socios inscritos junto con su frecuencia (Quincenal o Mensual).
-* 📅 **Selector de Fecha:** Permite indicar la fecha exacta en la que el socio realizó el pago.
-* ⚙️ **Evaluador Automático de Mora:** Compara el día del pago y, si excede las fechas límite (días 2 y 16), genera la multa correspondiente ($4.000 o $8.000) acumulándola en el registro de la transacción[cite: 1].
-* 🎲 **Casilla de Rifa:** Permite marcar si el socio está pagando o acumulando su cuota de rifa de $10.000[cite: 1].
-* 📋 **Tabla de Historial:** Muestra el detalle de todas las transacciones guardadas.
-
-Pega este código en tu `app.py` de GitHub y recarga tu página de Streamlit para ver los campos en pantalla[cite: 1]. ¿Qué tal se ve?
