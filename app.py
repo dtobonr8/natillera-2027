@@ -3,9 +3,6 @@ import pandas as pd
 import json
 import os
 from datetime import datetime, date
-import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
 
 # Configuración de la página
 st.set_page_config(
@@ -391,69 +388,18 @@ elif opcion == "🔐 Panel de Administración":
     col6.metric("👥 Total Socios", f"{len(datos['socios'])} / 30")
 
     st.divider()
-    st.subheader("📥 Descargar Reporte Gerencial en Excel")
+    st.subheader("📥 Exportar Datos")
     
-    if st.button("Generar Reporte Gerencial Excel"):
-        wb = openpyxl.Workbook()
-        
-        header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
-        header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-        title_font = Font(name="Calibri", size=14, bold=True, color="1F4E78")
-        normal_font = Font(name="Calibri", size=11)
-        bold_font = Font(name="Calibri", size=11, bold=True)
-        thin_border = Border(left=Side(style='thin', color='BDC3C7'), right=Side(style='thin', color='BDC3C7'), top=Side(style='thin', color='BDC3C7'), bottom=Side(style='thin', color='BDC3C7'))
-
-        ws1 = wb.active
-        ws1.title = "Resumen Financiero"
-        ws1.views.sheetView[0].showGridLines = True
-        
-        ws1['A1'] = "PANEL FINANCIERO INTERNO - NATILLERA 2027"
-        ws1['A1'].font = title_font
-        ws1.append([])
-        
-        ws1.append(["Concepto Administrativo", "Valor ($)"])
-        for col in range(1, 3):
-            cell = ws1.cell(row=3, column=col)
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-
-        kpis = [
-            ("Total Ahorros de Socios", total_ahorros),
-            ("Rendimientos Fondo de Rifas", total_rifas_fondo),
-            ("Intereses de Préstamos Cobrados", total_intereses),
-            ("Multas por Mora Acumuladas", total_multas),
-            ("Fondo Total en Caja", caja_total),
-            ("Capital Actual en Préstamos", prestamos_activos_total)
-        ]
-
-        for idx, (concepto, val) in enumerate(kpis, start=4):
-            ws1.append([concepto, val])
-            c1 = ws1.cell(row=idx, column=1)
-            c2 = ws1.cell(row=idx, column=2)
-            c1.font = normal_font
-            c2.font = bold_font if idx == 8 else normal_font
-            c1.border = thin_border
-            c2.border = thin_border
-            c2.number_format = '$#,##0'
-
-        for sheet in wb.worksheets:
-            for col in sheet.columns:
-                max_len = max(len(str(cell.value or '')) for cell in col)
-                col_letter = get_column_letter(col[0].column)
-                sheet.column_dimensions[col_letter].width = max(max_len + 3, 14)
-
-        excel_admin_name = "natillera_reporte_gerencial_admin.xlsx"
-        wb.save(excel_admin_name)
-
-        with open(excel_admin_name, "rb") as f:
-            st.download_button(
-                label="📥 Descargar Excel Gerencial (Admin)",
-                data=f,
-                file_name="natillera_reporte_gerencial_admin.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-        st.success("✅ ¡Reporte gerencial generado exitosamente!")
+    # Botón de exportación CSV nativo de Pandas (sin requerir openpyxl)
+    df_export = pd.DataFrame(datos["socios"])
+    if not df_export.empty:
+        csv_data = df_export.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Descargar Listado de Socios (CSV)",
+            data=csv_data,
+            file_name="socios_natillera_2027.csv",
+            mime="text/csv"
+        )
 
 # ----------------------------------------------------
 # 7. RESUMEN Y LIQUIDACIÓN
@@ -466,4 +412,39 @@ elif opcion == "📊 Resumen y Liquidación":
     total_multas = sum([a.get("multa_pendiente", 0) for a in datos["ahorros"]])
     total_intereses = sum([ab.get("pago_interes", 0) for ab in datos["abonos_prestamos"]])
     
-    fondo_comun_ganancias = total_rifa_fondo + total_multas + total_
+    fondo_comun_ganancias = total_rifa_fondo + total_multas + total_intereses
+    gran_total_caja = total_ahorro + fondo_comun_ganancias
+    
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("💰 Total Ahorros", f"${total_ahorro:,.0f}")
+    col2.metric("🎲 Rendimientos Rifas", f"${total_rifa_fondo:,.0f}")
+    col3.metric("📈 Intereses Cobrados", f"${total_intereses:,.0f}")
+    col4.metric("🚨 Total Multas Mora", f"${total_multas:,.0f}")
+    
+    st.divider()
+    st.subheader("🏦 Fondo Total en Caja: $" + f"{gran_total_caja:,.0f}")
+    
+    st.subheader("📋 Proyección de Liquidación por Socio")
+    if datos["socios"]:
+        liq_list = []
+        for s in datos["socios"]:
+            ahorro_s = sum([a.get("ahorro", 0) for a in datos["ahorros"] if a["socio_id"] == s["id"]])
+            multas_s = sum([a.get("multa_pendiente", 0) for a in datos["ahorros"] if a["socio_id"] == s["id"]])
+            
+            prestamos_s = [p for p in datos["prestamos"] if p["socio_id"] == s["id"]]
+            deuda_capital_s = sum([p.get("saldo_capital", 0) for p in prestamos_s])
+            
+            neto_a_entregar = ahorro_s - multas_s - deuda_capital_s
+            
+            liq_list.append({
+                "ID": s["id"],
+                "Nombre": s["nombre"],
+                "Ahorro Bruto": f"${ahorro_s:,.0f}",
+                "(-) Multas Morosas": f"${multas_s:,.0f}",
+                "(-) Saldo Préstamos": f"${deuda_capital_s:,.0f}",
+                "👉 Liquidación Neta": f"${neto_a_entregar:,.0f}"
+            })
+            
+        st.dataframe(pd.DataFrame(liq_list), use_container_width=True)
+    else:
+        st.write("No hay socios registrados para liquidar.")
