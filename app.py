@@ -14,18 +14,27 @@ st.set_page_config(
 FECHA_INICIO_NATILLERA = date(2027, 1, 15)
 DATA_FILE = "natillera_data.json"
 
-# Cargar y Guardar Datos
+# Cargar y Guardar Datos (con validación de llaves para evitar KeyError)
 def cargar_datos():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r") as f:
-            return json.load(f)
-    return {
+    estructura_base = {
         "socios": [],
         "ahorros": [],
         "rifas_sorteos": [],
         "prestamos": [],
         "abonos_prestamos": []
     }
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r") as f:
+                datos = json.load(f)
+                # Asegurar que todas las llaves existan
+                for key in estructura_base:
+                    if key not in datos:
+                        datos[key] = estructura_base[key]
+                return datos
+        except:
+            return estructura_base
+    return estructura_base
 
 def guardar_datos(datos):
     with open(DATA_FILE, "w") as f:
