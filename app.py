@@ -87,7 +87,7 @@ if opcion == "👥 Socios":
             else:
                 numeros_ocupados = [s["numero_rifa"] for s in datos["socios"]]
                 if numero_rifa in numeros_ocupados:
-                    st.error(f"❌ El número {numero_rifa:02d} ya está asignado a otro socio.")
+                    st.error("❌ El número " + f"{numero_rifa:02d}" + " ya está asignado a otro socio.")
                 else:
                     nuevo_socio = {
                         "id": len(datos["socios"]) + 1,
@@ -98,7 +98,7 @@ if opcion == "👥 Socios":
                     }
                     datos["socios"].append(nuevo_socio)
                     guardar_datos(datos)
-                    st.success(f"✅ Socio {nombre} registrado correctamente con el número {numero_rifa:02d}.")
+                    st.success("✅ Socio registrado correctamente.")
 
     st.subheader("📋 Listado de Socios Registrados")
     if datos["socios"]:
@@ -106,7 +106,7 @@ if opcion == "👥 Socios":
         df_socios["numero_rifa"] = df_socios["numero_rifa"].apply(lambda x: f"{x:02d}")
         df_socios.columns = ["ID", "Nombre", "Teléfono", "N° Rifa", "Frecuencia"]
         st.dataframe(df_socios, use_container_width=True)
-        st.caption(f"Total inscritos: {len(datos['socios'])} / 30 cupos.")
+        st.caption("Total inscritos: " + str(len(datos['socios'])) + " / 30 cupos.")
         
         st.divider()
         st.subheader("🗑️ Eliminar Socio")
@@ -177,7 +177,7 @@ elif opcion == "💵 Ahorros y Multas":
                 if multa_aplicada > 0:
                     st.warning("⚠️ Pago (" + tipo_pago + ") registrado fuera de fecha límite. Se acumula una multa para fin de año.")
                 else:
-                    st.success("✅ Transacción en " + tipo_pago + " registrada con éxito para " + socio_info['nombre'] + ".")
+                    st.success("✅ Transacción en " + tipo_pago + " registrada con éxito.")
 
         st.subheader("📊 Historial de Pagos y Ahorros Registrados")
         if datos["ahorros"]:
@@ -205,7 +205,7 @@ elif opcion == "🎲 Rifa (Lotería)":
         
         if btn_registrar_sorteo:
             ganador_info = next((s for s in datos["socios"] if s["numero_rifa"] == numero_ganador), None)
-            total_recaudado_rifa = sum([a["rifa"] for a in datos["ahorros"]])
+            total_recaudado_rifa = sum([a.get("rifa", 0) for a in datos["ahorros"]])
             premio_ganador = total_recaudado_rifa * 0.5
             fondo_comun_rifa = total_recaudado_rifa * 0.5
             
@@ -225,7 +225,7 @@ elif opcion == "🎲 Rifa (Lotería)":
             
             if ganador_info:
                 st.balloons()
-                st.success("🎉 ¡Felicidades a " + nombre_ganador + "! Número " + f"{numero_ganador:02d}" + ".")
+                st.success("🎉 ¡Felicidades a " + nombre_ganador + "!")
             else:
                 st.info("El número no está asignado a ningún socio. El 100% pasa al fondo común.")
 
@@ -271,7 +271,7 @@ elif opcion == "🏦 Préstamos y Cartera":
                     }
                     datos["prestamos"].append(rec_p)
                     guardar_datos(datos)
-                    st.success("✅ Préstamo registrado para " + socio_info['nombre'] + ".")
+                    st.success("✅ Préstamo registrado con éxito.")
 
         with tab2:
             prestamos_activos = [p for p in datos["prestamos"] if p["saldo_capital"] > 0]
@@ -338,11 +338,11 @@ elif opcion == "📈 Reportes y Estado":
     else:
         reporte_list = []
         for s in datos["socios"]:
-            ahorro_s = sum([a["ahorro"] for a in datos["ahorros"] if a["socio_id"] == s["id"]])
-            rifa_s = sum([a["rifa"] for a in datos["ahorros"] if a["socio_id"] == s["id"]])
-            multas_s = sum([a["multa_pendiente"] for a in datos["ahorros"] if a["socio_id"] == s["id"]])
+            ahorro_s = sum([a.get("ahorro", 0) for a in datos["ahorros"] if a["socio_id"] == s["id"]])
+            rifa_s = sum([a.get("rifa", 0) for a in datos["ahorros"] if a["socio_id"] == s["id"]])
+            multas_s = sum([a.get("multa_pendiente", 0) for a in datos["ahorros"] if a["socio_id"] == s["id"]])
             prestamos_s = [p for p in datos["prestamos"] if p["socio_id"] == s["id"]]
-            deuda_capital_s = sum([p["saldo_capital"] for p in prestamos_s])
+            deuda_capital_s = sum([p.get("saldo_capital", 0) for p in prestamos_s])
             
             reporte_list.append({
                 "ID": s["id"],
@@ -368,7 +368,102 @@ elif opcion == "📈 Reportes y Estado":
 # ----------------------------------------------------
 elif opcion == "🔐 Panel de Administración":
     st.header("🔐 Panel de Control Administrativo (Privado)")
-    st.caption("Resumen financiero interno para el tesorero / administrador, con opción de descarga de Excel gerencial.")
+    st.caption("Resumen financiero interno para el tesorero / administrador.")
 
-    total_ahorros = sum([a["ahorro"] for a in datos["ahorros"]])
-    total_rifas_fondo = sum([r["aporte_fondo"] for r in
+    total_ahorros = sum([a.get("ahorro", 0) for a in datos["ahorros"]])
+    total_rifas_fondo = sum([r.get("aporte_fondo", 0) for r in datos["rifas_sorteos"]])
+    total_multas = sum([a.get("multa_pendiente", 0) for a in datos["ahorros"]])
+    total_intereses = sum([ab.get("pago_interes", 0) for ab in datos["abonos_prestamos"]])
+    
+    prestamos_activos_total = sum([p.get("saldo_capital", 0) for p in datos["prestamos"]])
+    
+    ganancias_fondo = total_rifas_fondo + total_multas + total_intereses
+    caja_total = total_ahorros + ganancias_fondo
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("💰 Total Ahorros de Socios", f"${total_ahorros:,.0f}")
+    col2.metric("📈 Ganancias del Fondo", f"${ganancias_fondo:,.0f}")
+    col3.metric("🏦 Dinero Total en Caja", f"${caja_total:,.0f}")
+
+    col4, col5, col6 = st.columns(3)
+    col4.metric("💳 Capital en Préstamos", f"${prestamos_activos_total:,.0f}")
+    col5.metric("🚨 Multas por Cobrar", f"${total_multas:,.0f}")
+    col6.metric("👥 Total Socios", f"{len(datos['socios'])} / 30")
+
+    st.divider()
+    st.subheader("📥 Descargar Reporte Gerencial en Excel")
+    
+    if st.button("Generar Reporte Gerencial Excel"):
+        wb = openpyxl.Workbook()
+        
+        header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+        header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+        title_font = Font(name="Calibri", size=14, bold=True, color="1F4E78")
+        normal_font = Font(name="Calibri", size=11)
+        bold_font = Font(name="Calibri", size=11, bold=True)
+        thin_border = Border(left=Side(style='thin', color='BDC3C7'), right=Side(style='thin', color='BDC3C7'), top=Side(style='thin', color='BDC3C7'), bottom=Side(style='thin', color='BDC3C7'))
+
+        ws1 = wb.active
+        ws1.title = "Resumen Financiero"
+        ws1.views.sheetView[0].showGridLines = True
+        
+        ws1['A1'] = "PANEL FINANCIERO INTERNO - NATILLERA 2027"
+        ws1['A1'].font = title_font
+        ws1.append([])
+        
+        ws1.append(["Concepto Administrativo", "Valor ($)"])
+        for col in range(1, 3):
+            cell = ws1.cell(row=3, column=col)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        kpis = [
+            ("Total Ahorros de Socios", total_ahorros),
+            ("Rendimientos Fondo de Rifas", total_rifas_fondo),
+            ("Intereses de Préstamos Cobrados", total_intereses),
+            ("Multas por Mora Acumuladas", total_multas),
+            ("Fondo Total en Caja", caja_total),
+            ("Capital Actual en Préstamos", prestamos_activos_total)
+        ]
+
+        for idx, (concepto, val) in enumerate(kpis, start=4):
+            ws1.append([concepto, val])
+            c1 = ws1.cell(row=idx, column=1)
+            c2 = ws1.cell(row=idx, column=2)
+            c1.font = normal_font
+            c2.font = bold_font if idx == 8 else normal_font
+            c1.border = thin_border
+            c2.border = thin_border
+            c2.number_format = '$#,##0'
+
+        for sheet in wb.worksheets:
+            for col in sheet.columns:
+                max_len = max(len(str(cell.value or '')) for cell in col)
+                col_letter = get_column_letter(col[0].column)
+                sheet.column_dimensions[col_letter].width = max(max_len + 3, 14)
+
+        excel_admin_name = "natillera_reporte_gerencial_admin.xlsx"
+        wb.save(excel_admin_name)
+
+        with open(excel_admin_name, "rb") as f:
+            st.download_button(
+                label="📥 Descargar Excel Gerencial (Admin)",
+                data=f,
+                file_name="natillera_reporte_gerencial_admin.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        st.success("✅ ¡Reporte gerencial generado exitosamente!")
+
+# ----------------------------------------------------
+# 7. RESUMEN Y LIQUIDACIÓN
+# ----------------------------------------------------
+elif opcion == "📊 Resumen y Liquidación":
+    st.header("📊 Resumen General del Fondo y Liquidación 2027")
+    
+    total_ahorro = sum([a.get("ahorro", 0) for a in datos["ahorros"]])
+    total_rifa_fondo = sum([r.get("aporte_fondo", 0) for r in datos["rifas_sorteos"]])
+    total_multas = sum([a.get("multa_pendiente", 0) for a in datos["ahorros"]])
+    total_intereses = sum([ab.get("pago_interes", 0) for ab in datos["abonos_prestamos"]])
+    
+    fondo_comun_ganancias = total_rifa_fondo + total_multas + total_
