@@ -42,7 +42,7 @@ def guardar_datos(datos):
 datos = cargar_datos()
 
 st.title("💰 Sistema de Gestión de Natillera 2027")
-st.caption("Inicio de vigencia: 15 de Enero de 2027 | Panel de Control y Sábana de Datos.")
+st.caption("Inicio de vigencia: 15 de Enero de 2027 | Panel de Control y Sábana Detallada.")
 
 # Navegación
 opcion = st.sidebar.radio(
@@ -324,61 +324,65 @@ elif opcion == "🏦 Préstamos y Cartera":
             st.dataframe(pd.DataFrame(datos["prestamos"]), use_container_width=True)
 
 # ----------------------------------------------------
-# 5. SÁBANA DE CONTROL (REPORTES DETALLADOS)
+# 5. SÁBANA DE CONTROL DETALLADA
 # ----------------------------------------------------
 elif opcion == "📈 Sábana de Control (Reportes)":
-    st.header("📈 Sábana de Control Detallada por Socio")
-    st.caption("Vista completa con el número de cuotas dadas, sumatorias de ahorro, rifas, multas y deudas de préstamos.")
+    st.header("📈 Sábana de Control Contable Detallada")
+    st.caption("Detalle exhaustivo por socio: número de cuotas dadas, sumatorias de ahorros, rifas, multas acumuladas, deudas y saldo neto.")
 
     if not datos["socios"]:
         st.warning("⚠️ No hay socios registrados.")
     else:
         sabana_list = []
         for s in datos["socios"]:
-            # Filtrar transacciones del socio
             pagos_socio = [a for a in datos["ahorros"] if a["socio_id"] == s["id"]]
             
-            # Cantidad de cuotas de ahorro registradas (cuántas veces ha pagado)
+            # Cuántas cuotas de ahorro ha dado
             cantidad_cuotas = len(pagos_socio)
             
-            # Sumatorias
+            # Sumatorias monetarias
             total_ahorro_s = sum([a.get("ahorro", 0) for a in pagos_socio])
             total_rifa_s = sum([a.get("rifa", 0) for a in pagos_socio])
             total_multas_s = sum([a.get("multa_pendiente", 0) for a in pagos_socio])
             
-            # Préstamos y deuda de capital
+            # Préstamos de capital pendientes
             prestamos_s = [p for p in datos["prestamos"] if p["socio_id"] == s["id"]]
             deuda_capital_s = sum([p.get("saldo_capital", 0) for p in prestamos_s])
+            
+            # Saldo Neto (Ahorro bruto menos multas y deudas de préstamos)
+            saldo_neto_s = total_ahorro_s - total_multas_s - deuda_capital_s
             
             sabana_list.append({
                 "ID": s["id"],
                 "Socio": s["nombre"],
                 "N° Rifa": f"{s['numero_rifa']:02d}",
                 "Frecuencia": s["frecuencia"],
-                "Cant. Cuotas Dadas": cantidad_cuotas,
+                "N° Cuotas Pagadas": cantidad_cuotas,
                 "Total Ahorrado ($)": total_ahorro_s,
                 "Aporte Rifas ($)": total_rifa_s,
-                "Multas Acumuladas ($)": total_multas_s,
-                "Deuda Préstamos ($)": deuda_capital_s
+                "Multas Mora ($)": total_multas_s,
+                "Deuda Préstamos ($)": deuda_capital_s,
+                "Saldo Neto Final ($)": saldo_neto_s
             })
             
         df_sabana = pd.DataFrame(sabana_list)
         
-        # Mostrar tabla interactiva con formato de moneda
+        # Mostrar tabla interactiva con formato completo
         st.dataframe(df_sabana.style.format({
             "Total Ahorrado ($)": "${:,.0f}",
             "Aporte Rifas ($)": "${:,.0f}",
-            "Multas Acumuladas ($)": "${:,.0f}",
-            "Deuda Préstamos ($)": "${:,.0f}"
+            "Multas Mora ($)": "${:,.0f}",
+            "Deuda Préstamos ($)": "${:,.0f}",
+            "Saldo Neto Final ($)": "${:,.0f}"
         }), use_container_width=True)
 
-        # Botón de descarga en CSV (Sábana Completa)
+        # Botón para descargar la sábana detallada en CSV
         st.divider()
         csv_sabana = df_sabana.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 Descargar Sábana Completa en CSV",
+            label="📥 Descargar Sábana Contable Detallada (CSV)",
             data=csv_sabana,
-            file_name="sabana_control_natillera_2027.csv",
+            file_name="sabana_contable_natillera_2027.csv",
             mime="text/csv"
         )
 
