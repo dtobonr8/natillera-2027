@@ -177,7 +177,7 @@ elif opcion == "💵 Ahorros y Multas":
                 if multa_aplicada > 0:
                     st.warning(f"⚠️ Pago ({tipo_pago}) registrado fuera de fecha límite. Se acumula una multa de ${multa_aplicada:,.0f} para fin de año.")
                 else:
-                    st.success(f"✅ Transacción en **{tipo_pago}** registrada con éxito para {socio_info['nombre']}.")
+                    st.success(f"✅ Transacción en {tipo_pago} registrada con éxito para {socio_info['nombre']}.")
 
         st.subheader("📊 Historial de Pagos y Ahorros Registrados")
         if datos["ahorros"]:
@@ -386,4 +386,29 @@ elif opcion == "🔐 Panel de Administración":
     col3.metric("🏦 Dinero Total en Caja", f"${caja_total:,.0f}")
 
     col4, col5, col6 = st.columns(3)
-    col4.metric("💳 Capital en Préstamos Activos", f"${prestamos_activos_total:
+    col4.metric("💳 Capital en Préstamos Activos", f"${prestamos_activos_total:,.0f}")
+    col5.metric("🚨 Total Multas por Cobrar", f"${total_multas:,.0f}")
+    col6.metric("👥 Total Socios Inscritos", f"{len(datos['socios'])} / 30")
+
+    st.divider()
+    st.subheader("📥 Descargar Reporte Gerencial en Excel (Para Ti)")
+    st.write("Genera un archivo Excel profesional con pestañas separadas de **Resumen Financiero**, **Detalle de Socios** y **Cartera de Préstamos**.")
+
+    if st.button("Generar Reporte Gerencial Excel"):
+        wb = openpyxl.Workbook()
+        
+        header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+        header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+        title_font = Font(name="Calibri", size=14, bold=True, color="1F4E78")
+        normal_font = Font(name="Calibri", size=11)
+        bold_font = Font(name="Calibri", size=11, bold=True)
+        thin_border = Border(left=Side(style='thin', color='BDC3C7'), right=Side(style='thin', color='BDC3C7'), top=Side(style='thin', color='BDC3C7'), bottom=Side(style='thin', color='BDC3C7'))
+
+        # PESTAÑA 1: Resumen Financiero
+        ws1 = wb.active
+        ws1.title = "Resumen Financiero"
+        ws1.views.sheetView[0].showGridLines = True
+        
+        ws1['A1'] = "PANEL FINANCIERO INTERNO - NATILLERA 2027"
+        ws1['A1'].font = title_font
+        ws1.append([])
