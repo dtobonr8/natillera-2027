@@ -3,6 +3,9 @@ import pandas as pd
 import json
 import os
 from datetime import datetime, date
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
 # Configuración de la página
 st.set_page_config(
@@ -14,7 +17,7 @@ st.set_page_config(
 FECHA_INICIO_NATILLERA = date(2027, 1, 15)
 DATA_FILE = "natillera_data.json"
 
-# Cargar y Guardar Datos (con validación de llaves para evitar KeyError)
+# Cargar y Guardar Datos
 def cargar_datos():
     estructura_base = {
         "socios": [],
@@ -27,7 +30,6 @@ def cargar_datos():
         try:
             with open(DATA_FILE, "r") as f:
                 datos = json.load(f)
-                # Asegurar que todas las llaves existan
                 for key in estructura_base:
                     if key not in datos:
                         datos[key] = estructura_base[key]
@@ -43,7 +45,7 @@ def guardar_datos(datos):
 datos = cargar_datos()
 
 st.title("💰 Sistema de Gestión de Natillera 2027")
-st.caption("Inicio de vigencia: 15 de Enero de 2027 | Control de ahorros, rifas, préstamos y liquidación.")
+st.caption("Inicio de vigencia: 15 de Enero de 2027 | Panel de Control y Administración.")
 
 # Navegación
 opcion = st.sidebar.radio(
@@ -53,6 +55,8 @@ opcion = st.sidebar.radio(
         "💵 Ahorros y Multas", 
         "🎲 Rifa (Lotería)", 
         "🏦 Préstamos y Cartera", 
+        "📈 Reportes y Estado",
+        "🔐 Panel de Administración",
         "📊 Resumen y Liquidación"
     ]
 )
@@ -103,11 +107,23 @@ if opcion == "👥 Socios":
         df_socios.columns = ["ID", "Nombre", "Teléfono", "N° Rifa", "Frecuencia"]
         st.dataframe(df_socios, use_container_width=True)
         st.caption(f"Total inscritos: {len(datos['socios'])} / 30 cupos.")
+        
+        st.divider()
+        st.subheader("🗑️ Eliminar Socio")
+        socios_opciones_borrar = {f"ID {s['id']} - {s['nombre']} (Rifa: {s['numero_rifa']:02d})": s['id'] for s in datos["socios"]}
+        socio_a_borrar_str = st.selectbox("Selecciona el socio que deseas eliminar", list(socios_opciones_borrar.keys()))
+        
+        if st.button("Eliminar Socio Seleccionado", type="primary"):
+            id_a_eliminar = socios_opciones_borrar[socio_a_borrar_str]
+            datos["socios"] = [s for s in datos["socios"] if s["id"] != id_a_eliminar]
+            guardar_datos(datos)
+            st.success("✅ Socio eliminado correctamente.")
+            st.rerun()
     else:
         st.write("Aún no hay socios registrados.")
 
 # ----------------------------------------------------
-# 2. MÓDULO DE AHORROS Y MULTAS
+# 2. MÓDULO DE AHORROS Y MULTAS (CON TIPO DE PAGO)
 # ----------------------------------------------------
 elif opcion == "💵 Ahorros y Multas":
     st.header("💵 Control de Ahorros y Penalizaciones")
@@ -128,6 +144,7 @@ elif opcion == "💵 Ahorros y Multas":
                 monto_ahorro = st.number_input("Valor Cuota de Ahorro ($)", min_value=0, step=5000)
             with col2:
                 incluir_rifa = st.checkbox("¿Pagar cuota de rifa del mes ($10.000)?", value=True)
+                tipo_pago = st.selectbox("Tipo de Pago", ["Efectivo", "Transferencia"])
                 
             btn_guardar_pago = st.form_submit_button("Registrar Transacción")
             
@@ -150,16 +167,17 @@ elif opcion == "💵 Ahorros y Multas":
                     "fecha": str(fecha_pago),
                     "ahorro": monto_ahorro,
                     "rifa": monto_rifa,
-                    "multa_pendiente": multa_aplicada
+                    "multa_pendiente": multa_aplicada,
+                    "tipo_pago": tipo_pago
                 }
                 
                 datos["ahorros"].append(registro)
                 guardar_datos(datos)
                 
                 if multa_aplicada > 0:
-                    st.warning(f"⚠️ Pago registrado fuera de fecha límite. Se acumula una multa de ${multa_aplicada:,.0f} para fin de año.")
+                    st.warning(f"⚠️ Pago ({tipo_pago}) registrado fuera de fecha límite. Se acumula una multa de ${multa_aplicada:,.0f} para fin de año.")
                 else:
-                    st.success(f"✅ Transacción registrada con éxito para {socio_info['nombre']}.")
+                    st.success(f"✅ Transacción en **{tipo_pago}** registrada con éxito para {socio_info['nombre']}.")
 
         st.subheader("📊 Historial de Pagos y Ahorros Registrados")
         if datos["ahorros"]:
@@ -302,56 +320,70 @@ elif opcion == "🏦 Préstamos y Cartera":
                         datos["abonos_prestamos"].append(rec_abono)
                         guardar_datos(datos)
                         
-                        st.success(f"✅ Abono procesado: ${pago_interes:,.0f} a intereses | ${abono_capital:,.0f} a capital. Nuevo saldo: ${max(0, p_info['saldo_capital'] - abono_capital):,.0f}.")
+                        st.success(f"✅ Abono procesado: ${pago_interes:,.0f} a intereses \vert{}${abono_capital:,.0f} a capital. Nuevo saldo: ${max(0, p_info['saldo_capital'] - abono_capital):,.0f}.")
 
         st.subheader("📋 Resumen de Cartera y Préstamos")
         if datos["prestamos"]:
             st.dataframe(pd.DataFrame(datos["prestamos"]), use_container_width=True)
 
 # ----------------------------------------------------
-# 5. RESUMEN Y LIQUIDACIÓN
+# 5. MÓDULO DE REPORTES Y ESTADO
 # ----------------------------------------------------
-elif opcion == "📊 Resumen y Liquidación":
-    st.header("📊 Resumen General del Fondo y Liquidación 2027")
-    
-    total_ahorro = sum([a["ahorro"] for a in datos["ahorros"]])
-    total_rifa_fondo = sum([r["aporte_fondo"] for r in datos["rifas_sorteos"]])
-    total_multas = sum([a["multa_pendiente"] for a in datos["ahorros"]])
-    total_intereses = sum([ab["pago_interes"] for ab in datos["abonos_prestamos"]])
-    
-    fondo_comun_ganancias = total_rifa_fondo + total_multas + total_intereses
-    gran_total_caja = total_ahorro + fondo_comun_ganancias
-    
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("💰 Total Ahorros", f"${total_ahorro:,.0f}")
-    col2.metric("🎲 Rendimientos Rifas", f"${total_rifa_fondo:,.0f}")
-    col3.metric("📈 Intereses Cobrados", f"${total_intereses:,.0f}")
-    col4.metric("🚨 Total Multas Mora", f"${total_multas:,.0f}")
-    
-    st.divider()
-    st.subheader(f"🏦 Fondo Total en Caja: ${gran_total_caja:,.0f}")
-    
-    st.subheader("📋 Proyección de Liquidación por Socio")
-    if datos["socios"]:
-        liq_list = []
+elif opcion == "📈 Reportes y Estado":
+    st.header("📈 Reportes y Estado Financiero General")
+    st.caption("Tablas de consulta general para la natillera.")
+
+    if not datos["socios"]:
+        st.warning("⚠️ No hay socios registrados.")
+    else:
+        reporte_list = []
         for s in datos["socios"]:
             ahorro_s = sum([a["ahorro"] for a in datos["ahorros"] if a["socio_id"] == s["id"]])
+            rifa_s = sum([a["rifa"] for a in datos["ahorros"] if a["socio_id"] == s["id"]])
             multas_s = sum([a["multa_pendiente"] for a in datos["ahorros"] if a["socio_id"] == s["id"]])
-            
             prestamos_s = [p for p in datos["prestamos"] if p["socio_id"] == s["id"]]
             deuda_capital_s = sum([p["saldo_capital"] for p in prestamos_s])
             
-            neto_a_entregar = ahorro_s - multas_s - deuda_capital_s
-            
-            liq_list.append({
+            reporte_list.append({
                 "ID": s["id"],
                 "Nombre": s["nombre"],
-                "Ahorro Bruto": f"${ahorro_s:,.0f}",
-                "(-) Multas Morosas": f"${multas_s:,.0f}",
-                "(-) Saldo Préstamos": f"${deuda_capital_s:,.0f}",
-                "👉 Liquidación Neta": f"${neto_a_entregar:,.0f}"
+                "N° Rifa": f"{s['numero_rifa']:02d}",
+                "Frecuencia": s["frecuencia"],
+                "Ahorro Acumulado": ahorro_s,
+                "Aporte Rifas": rifa_s,
+                "Multas Acumuladas": multas_s,
+                "Deuda Préstamos": deuda_capital_s
             })
             
-        st.dataframe(pd.DataFrame(liq_list), use_container_width=True)
-    else:
-        st.write("No hay socios registrados para liquidar.")
+        df_reporte = pd.DataFrame(reporte_list)
+        st.dataframe(df_reporte.style.format({
+            "Ahorro Acumulado": "${:,.0f}",
+            "Aporte Rifas": "${:,.0f}",
+            "Multas Acumuladas": "${:,.0f}",
+            "Deuda Préstamos": "${:,.0f}"
+        }), use_container_width=True)
+
+# ----------------------------------------------------
+# 6. PANEL DE ADMINISTRACIÓN (EXCLUSIVO PARA TI)
+# ----------------------------------------------------
+elif opcion == "🔐 Panel de Administración":
+    st.header("🔐 Panel de Control Administrativo (Privado)")
+    st.caption("Resumen financiero interno para el tesorero / administrador, con opción de descarga de Excel gerencial.")
+
+    total_ahorros = sum([a["ahorro"] for a in datos["ahorros"]])
+    total_rifas_fondo = sum([r["aporte_fondo"] for r in datos["rifas_sorteos"]])
+    total_multas = sum([a["multa_pendiente"] for a in datos["ahorros"]])
+    total_intereses = sum([ab["pago_interes"] for ab in datos["abonos_prestamos"]])
+    
+    prestamos_activos_total = sum([p["saldo_capital"] for p in datos["prestamos"]])
+    
+    ganancias_fondo = total_rifas_fondo + total_multas + total_intereses
+    caja_total = total_ahorros + ganancias_fondo
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("💰 Total Ahorros de Socios", f"${total_ahorros:,.0f}")
+    col2.metric("📈 Ganancias del Fondo (Intereses+Multas+Rifas)", f"${ganancias_fondo:,.0f}")
+    col3.metric("🏦 Dinero Total en Caja", f"${caja_total:,.0f}")
+
+    col4, col5, col6 = st.columns(3)
+    col4.metric("💳 Capital en Préstamos Activos", f"${prestamos_activos_total:
